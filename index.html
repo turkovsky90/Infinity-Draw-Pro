@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Infinity Draw Pro</title>
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/png" href="https://icons8.com">
+    <link rel="apple-touch-icon" href="https://icons8.com">
+
+    <style>
+        :root { --bg: #121212; --surf: #2b2930; --primary: #d0bcff; --on-surf: #e6e1e5; --border: 1px solid #444; }
+        body { margin: 0; overflow: hidden; background: var(--bg); font-family: 'Roboto', sans-serif; color: var(--on-surf); touch-action: none; user-select: none; }
+        
+        #header { position: fixed; top: 0; left: 0; right: 0; background: #1a1a1a; display: flex; align-items: center; padding: 8px 12px; z-index: 100; height: 48px; gap: 10px; border-bottom: 1px solid #333; }
+        #tabsList { display: flex; gap: 8px; overflow-x: auto; scroll-behavior: smooth; height: 100%; align-items: center; }
+        #tabsList::-webkit-scrollbar { display: none; }
+        
+        .tab { background: #3d3b41; padding: 0 15px; border-radius: 30px; display: flex; align-items: center; gap: 8px; border: 2px solid transparent; height: 46px; min-width: 110px; box-sizing: border-box; }
+        .tab.active { background: var(--surf); border-color: var(--primary); }
+        .tab input { background: transparent; border: none; color: white; width: 90px; font-size: 15px; outline: none; font-weight: 500; }
+        .close-tab { color: #ff8a80; font-size: 22px; cursor: pointer; display: none; margin-left: 4px; }
+        .can-close .close-tab { display: block; }
+        .add-btn { background: #3d3b41; border: none; border-radius: 25px; min-width: 48px; height: 46px; color: white; font-size: 24px; display: flex; align-items: center; justify-content: center; }
+
+        #sideConsole { position: fixed; top: 110px; left: 16px; background: var(--surf); border-radius: 30px; display: flex; flex-direction: column; gap: 8px; padding: 8px; border: var(--border); z-index: 150; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+        .side-btn { background: transparent; border: none; color: var(--primary); width: 48px; height: 48px; border-radius: 50%; font-size: 22px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        #fileMenu { display: none; flex-direction: column; gap: 8px; border-top: 1px solid #444; padding-top: 8px; margin-top: 5px; }
+
+        #sizePreview { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 130px; height: 130px; background: rgba(0,0,0,0.6); border-radius: 50%; display: none; align-items: center; justify-content: center; z-index: 200; border: 1px solid #555; pointer-events: none; }
+        #sizeCircle { background: var(--primary); border-radius: 50%; opacity: 0.8; }
+
+        #toolbar { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); background: var(--surf); padding: 8px 22px; border-radius: 60px; display: flex; gap: 14px; align-items: center; z-index: 100; border: var(--border); box-shadow: 0 8px 35px rgba(0,0,0,0.7); }
+        .tool-btn { background: none; border: none; font-size: 26px; padding: 10px; border-radius: 50%; }
+        .tool-btn.active { background: #4a4458; }
+        .divider { width: 1px; height: 32px; background: #444; }
+
+        #curCol { width: 36px; height: 36px; border-radius: 50%; border: 2.5px solid white; transition: 0.3s; }
+        #curCol.disabled { background: #444 !important; border-color: #666; opacity: 0.3; filter: grayscale(1); }
+
+        #palette { position: fixed; bottom: 100px; right: 16px; background: var(--surf); padding: 12px; border-radius: 28px; display: none; grid-template-columns: repeat(2, 1fr); gap: 10px; z-index: 200; border: var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.8); }
+        .color-dot { width: 42px; height: 42px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
+
+        canvas { display: block; background: #121212; }
+    </style>
+</head>
+<body>
+
+<div id="header">
+    <div id="tabsList"></div>
+    <button class="add-btn" onclick="addProj()">+</button>
+</div>
+
+<div id="sizePreview"><div id="sizeCircle"></div></div>
+
+<div id="sideConsole">
+    <button class="side-btn" onclick="undo()">↩️</button>
+    <button class="side-btn" onclick="redo()">↪️</button>
+    <button class="side-btn" id="toggleFilesBtn" onclick="toggleFiles()" style="color:white">⋯</button>
+    <div id="fileMenu">
+        <button class="side-btn" onclick="save()">💾</button>
+        <button class="side-btn" onclick="document.getElementById('fin').click()">📂</button>
+        <button class="side-btn" onclick="exportImg()">🖼️</button>
+    </div>
+    <input type="file" id="fin" style="display:none" onchange="load(this)">
+</div>
+
+<div id="palette">
+    <div class="color-dot" style="background: #FF8A80;" onclick="pick('#FF8A80')"></div>
+    <div class="color-dot" style="background: #A7FFEB;" onclick="pick('#A7FFEB')"></div>
+    <div class="color-dot" style="background: #80D8FF;" onclick="pick('#80D8FF')"></div>
+    <div class="color-dot" style="background: #B388FF;" onclick="pick('#B388FF')"></div>
+    <div class="color-dot" style="background: #FFFF8D;" onclick="pick('#FFFF8D')"></div>
+    <div class="color-dot" style="background: #00E676;" onclick="pick('#00E676')"></div>
+    <div class="color-dot" style="background: #FFAB40;" onclick="pick('#FFAB40')"></div>
+    <div class="color-dot" style="background: #FFD180;" onclick="pick('#FFD180')"></div>
+    <div class="color-dot" style="background: #F48FB1;" onclick="pick('#F48FB1')"></div>
+    <div class="color-dot" style="background: #FFFFFF;" onclick="pick('#FFFFFF')"></div>
+</div>
+
+<div id="toolbar">
+    <button class="tool-btn active" id="bBrsh" onclick="setM('brush')">🖌️</button>
+    <button class="tool-btn" id="bErs" onclick="setM('eraser')">🧽</button>
+    <div class="divider"></div>
+    <input type="range" id="size" min="2" max="120" value="10" oninput="updateSizePreview(this.value)" onchange="hideSizePreview()" style="width:100px; accent-color: var(--primary);">
+    <div id="curCol" style="background:#B388FF;" onclick="togglePal()"></div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let projects = [{ name: 'Новый шедевр', paths: [], redoStack: [], offset: {x:0, y:0}, scale: 1 }];
+    let curIdx = 0, isDrawing = false, lastDist = 0, lastMid = null, mode = 'brush', color = '#B388FF';
+
+    function init() {
+        window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; draw(); };
+        window.onresize(); updTabs();
+    }
+
+    function updateSizePreview(val) {
+        const preview = document.getElementById('sizePreview');
+        const circle = document.getElementById('sizeCircle');
+        preview.style.display = 'flex';
+        circle.style.width = val + 'px'; circle.style.height = val + 'px';
+    }
+    function hideSizePreview() { document.getElementById('sizePreview').style.display = 'none'; }
+
+    canvas.addEventListener('touchstart', e => {
+        const p = projects[curIdx];
+        if (e.touches.length === 1) {
+            isDrawing = true;
+            const x = (e.touches[0].clientX - p.offset.x) / p.scale;
+            const y = (e.touches[0].clientY - p.offset.y) / p.scale;
+            p.paths.push({ color: mode==='eraser'?'#121212':color, width: document.getElementById('size').value / p.scale, pts: [{x, y}] });
+            p.redoStack = []; document.getElementById('palette').style.display = 'none';
+        } else if (e.touches.length === 2) {
+            isDrawing = false;
+            lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            lastMid = { x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 };
+        }
+    }, {passive: false});
+
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+        const p = projects[curIdx];
+        if (isDrawing && e.touches.length === 1) {
+            p.paths[p.paths.length-1].pts.push({ x: (e.touches[0].clientX - p.offset.x) / p.scale, y: (e.touches[0].clientY - p.offset.y) / p.scale });
+            draw();
+        } else if (e.touches.length === 2) {
+            const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            const mid = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
+            p.offset.x += (mid.x - lastMid.x); p.offset.y += (mid.y - lastMid.y);
+            if (lastDist > 0) {
+                const s = dist / lastDist;
+                p.offset.x = mid.x - (mid.x - p.offset.x) * s; p.offset.y = mid.y - (mid.y - p.offset.y) * s;
+                p.scale *= s;
+            }
+            lastDist = dist; lastMid = mid; draw();
+        }
+    }, {passive: false});
+
+    function draw() {
+        const p = projects[curIdx];
+        ctx.fillStyle = '#121212'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.save(); ctx.translate(p.offset.x, p.offset.y); ctx.scale(p.scale, p.scale);
+        p.paths.forEach(path => {
+            ctx.beginPath(); ctx.strokeStyle = path.color; ctx.lineWidth = path.width; ctx.lineCap = ctx.lineJoin = 'round';
+            if (path.pts.length > 0) {
+                ctx.moveTo(path.pts[0].x, path.pts[0].y);
+                for(let i=1; i<path.pts.length; i++) ctx.lineTo(path.pts[i].x, path.pts[i].y);
+            }
+            ctx.stroke();
+        });
+        ctx.restore();
+    }
+
+    function updTabs() {
+        const list = document.getElementById('tabsList'); list.innerHTML = '';
+        projects.forEach((p, i) => {
+            const d = document.createElement('div');
+            d.className = `tab ${i===curIdx?'active':''} ${projects.length>1?'can-close':''}`;
+            d.onclick = () => { curIdx = i; updTabs(); draw(); };
+            const inp = document.createElement('input'); inp.value = p.name;
+            inp.onchange = (e) => p.name = e.target.value;
+            inp.onclick = (e) => e.stopPropagation();
+            const cls = document.createElement('span'); cls.className = 'close-tab'; cls.innerHTML = '×';
+            cls.onclick = (e) => { e.stopPropagation(); projects.splice(i, 1); curIdx = Math.min(curIdx, projects.length-1); updTabs(); draw(); };
+            d.append(inp, cls); list.appendChild(d);
+        });
+    }
+
+    function addProj(pts = [], name = null, off = {x:0, y:0}, sc = 1) {
+        projects.push({ 
+            name: name || 'Арт ' + (projects.length+1), 
+            paths: pts, 
+            redoStack: [], 
+            offset: off, 
+            scale: sc 
+        });
+        curIdx = projects.length - 1; updTabs(); draw();
+    }
+
+    function toggleFiles() { 
+        const menu = document.getElementById('fileMenu');
+        const btn = document.getElementById('toggleFilesBtn');
+        const isOpen = menu.style.display === 'flex';
+        menu.style.display = isOpen ? 'none' : 'flex';
+        btn.innerHTML = isOpen ? '⋯' : '×';
+    }
+
+    function load(el) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = JSON.parse(e.target.result);
+                // Поддержка старых форматов
+                const paths = Array.isArray(data) ? data : (data.paths || []);
+                const name = data.name || 'Загруженный арт';
+                const off = data.offset || {x:0, y:0};
+                const sc = data.scale || 1;
+
+                if (projects[curIdx].paths.length === 0) {
+                    projects[curIdx].paths = paths; projects[curIdx].name = name;
+                    projects[curIdx].offset = off; projects[curIdx].scale = sc;
+                } else {
+                    addProj(paths, name, off, sc);
+                }
+                updTabs(); draw(); el.value = '';
+            } catch(err) { alert("Ошибка при чтении файла"); }
+        };
+        reader.readAsText(el.files[0]);
+    }
+
+    function save() {
+        const p = projects[curIdx];
+        const d = JSON.stringify({ name: p.name, paths: p.paths, offset: p.offset, scale: p.scale });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([d], {type:'application/json'}));
+        a.download = p.name + '.json'; a.click();
+    }
+
+    function setM(m) { 
+        mode = m; document.getElementById('bBrsh').classList.toggle('active', m==='brush'); 
+        document.getElementById('bErs').classList.toggle('active', m==='eraser'); 
+        document.getElementById('curCol').className = m==='eraser' ? 'disabled' : '';
+        document.getElementById('palette').style.display = 'none';
+    }
+    function togglePal() { if(mode==='brush'){ const p = document.getElementById('palette'); p.style.display = p.style.display === 'grid' ? 'none' : 'grid'; } }
+    function pick(c) { color = c; document.getElementById('curCol').style.background = c; setM('brush'); }
+    function undo() { if (projects[curIdx].paths.length) { projects[curIdx].redoStack.push(projects[curIdx].paths.pop()); draw(); } }
+    function redo() { if (projects[curIdx].redoStack.length) { projects[curIdx].paths.push(projects[curIdx].redoStack.pop()); draw(); } }
+    function exportImg() { const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = projects[curIdx].name + '.png'; a.click(); }
+
+    canvas.addEventListener('touchend', () => { isDrawing = false; lastDist = 0; });
+    init();
+</script>
+</body>
+</html>
