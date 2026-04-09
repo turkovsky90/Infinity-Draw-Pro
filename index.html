@@ -22,7 +22,7 @@
         .tab { background: #3d3b41; padding: 0 14px; border-radius: 28px; display: flex; align-items: center; gap: 6px; border: 1.5px solid transparent; height: 42px; min-width: 100px; flex-shrink: 0; cursor: pointer; }
         .tab.active { background: var(--surf); border-color: var(--primary); }
         .tab input { background: transparent; border: none; color: white; width: 85px; font-size: 14px; outline: none; font-weight: 500; cursor: text; }
-        .close-tab { color: #ff8a80; font-size: 20px; cursor: pointer; display: none; padding: 0 4px; }
+        .close-tab { color: #aaa; font-size: 20px; cursor: pointer; display: none; padding: 0 4px; }
         .can-close .close-tab { display: block; }
         .add-btn { background: #3d3b41; border: none; border-radius: 22px; min-width: 44px; height: 42px; color: white; font-size: 22px; margin-right: 5px; flex-shrink: 0; cursor: pointer; }
         .add-btn:active { background: #5a5668; }
@@ -34,22 +34,71 @@
         .menu-item:active { background: #4a4458; }
         .menu-sep { height: 1px; background: #444; margin: 4px 0; }
 
-        #toolbarContainer { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 100; }
-        #toolbar { background: var(--surf); padding: 6px 20px; border-radius: 55px; display: flex; gap: 12px; align-items: center; border: var(--border); box-shadow: 0 8px 30px rgba(0,0,0,0.7); position: relative; }
-        .tool-btn { background: none; border: none; font-size: 24px; padding: 9px; border-radius: 50%; cursor: pointer; }
+        /* Нижняя панель */
+        #toolbarContainer { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; }
+        #toolbar { 
+            background: var(--surf); 
+            padding: 5px 8px;
+            border-radius: 50px; 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+            border: var(--border); 
+            box-shadow: 0 8px 30px rgba(0,0,0,0.7); 
+            position: relative; 
+        }
+        .tool-btn { 
+            background: none; 
+            border: none; 
+            font-size: 22px;
+            padding: 7px;
+            border-radius: 50%; 
+            cursor: pointer; 
+        }
         .tool-btn.active { background: #4a4458; }
-        .divider { width: 1px; height: 30px; background: #444; }
+        .divider { width: 1px; height: 26px; background: #444; }
 
-        #curCol { width: 33px; height: 33px; border-radius: 50%; border: 2px solid white; transition: 0.3s; cursor: pointer; }
+        #curCol { width: 30px; height: 30px; border-radius: 50%; border: 2px solid white; transition: 0.3s; cursor: pointer; }
         #curCol.disabled { background: #444 !important; border-color: #666; opacity: 0.3; filter: grayscale(1); cursor: default; }
 
-        #palette { position: absolute; bottom: 110%; right: 0; background: var(--surf); padding: 10px; border-radius: 25px; display: none; grid-template-columns: repeat(2, 1fr); gap: 10px; z-index: 210; border: var(--border); box-shadow: 0 -5px 20px rgba(0,0,0,0.5); }
-        .color-dot { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
+        #palette { position: absolute; bottom: 110%; right: 0; background: var(--surf); padding: 8px; border-radius: 22px; display: none; grid-template-columns: repeat(2, 1fr); gap: 8px; z-index: 210; border: var(--border); box-shadow: 0 -5px 20px rgba(0,0,0,0.5); }
+        .color-dot { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
 
         #sizePreview { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 120px; height: 120px; background: rgba(0,0,0,0.6); border-radius: 50%; display: none; align-items: center; justify-content: center; z-index: 300; border: 1px solid #555; pointer-events: none; }
         #sizeCircle { background: var(--primary); border-radius: 50%; opacity: 0.8; }
 
         canvas { display: block; background: #121212; }
+        
+        /* Плоская иконка Undo - очень тонкая линия (в 1,5 раза тоньше) */
+        .undo-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            transition: background 0.2s;
+        }
+        .undo-icon svg {
+            width: 34px;
+            height: 34px;
+            stroke: white;
+            stroke-width: 1.2;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .undo-icon:active { background: #4a4458; }
+        
+        /* Ползунок средней длины */
+        input[type="range"] { 
+            width: 110px; 
+            accent-color: var(--primary);
+        }
     </style>
 </head>
 <body>
@@ -61,8 +110,7 @@
 </div>
 
 <div id="dropdownMenu">
-    <div class="menu-item" onclick="undo()">Undo</div>
-    <div class="menu-item" onclick="redo()">Redo</div>
+    <div class="menu-item" onclick="cleanCanvas()">Clean canvas</div>
     <div class="menu-sep"></div>
     <div class="menu-item" onclick="save()">Save Project</div>
     <div class="menu-item" onclick="document.getElementById('fin').click()">Open File</div>
@@ -77,8 +125,16 @@
         <button class="tool-btn active" id="bBrsh" onclick="setM('brush')">🖌️</button>
         <button class="tool-btn" id="bErs" onclick="setM('eraser')">🧽</button>
         <div class="divider"></div>
-        <input type="range" id="size" min="2" max="120" value="10" oninput="updateSizePreview(this.value)" onchange="hideSizePreview()" style="width:90px; accent-color: var(--primary);">
+        <input type="range" id="size" min="2" max="120" value="10" oninput="updateSizePreview(this.value)" onchange="hideSizePreview()">
         <div id="curCol" style="background:#B388FF;" onclick="togglePal()"></div>
+        <div class="divider"></div>
+        <!-- Очень тонкая белая стрелка с короткими усиками -->
+        <button class="undo-icon" onclick="undo()">
+            <svg viewBox="0 0 24 24">
+                <path d="M7 12L3 8L7 4" />
+                <path d="M3 8H12C14.5 8 16 9.5 16 12C16 14.5 14.5 16 12 16H9" />
+            </svg>
+        </button>
         
         <div id="palette">
             <div class="color-dot" style="background: #FF8A80;" onclick="pick('#FF8A80')"></div>
@@ -128,30 +184,22 @@
     }
     function hideSizePreview() { document.getElementById('sizePreview').style.display = 'none'; }
 
-    // ИСПРАВЛЕННАЯ ФУНКЦИЯ ЗАГРУЗКИ
     function loadFile(inputElement) {
         if (!inputElement.files || !inputElement.files[0]) return;
-        
         const file = inputElement.files[0];
         const reader = new FileReader();
-        
         reader.onload = function(e) {
             try {
                 const data = JSON.parse(e.target.result);
-                
-                // Проверяем структуру данных
                 let loadedPaths = [];
                 let loadedName = 'Imported';
                 let loadedOffset = { x: 0, y: 0 };
                 let loadedScale = 1;
                 
-                // Поддержка разных форматов сохранения
                 if (Array.isArray(data)) {
-                    // Старый формат: просто массив путей
                     loadedPaths = data;
                     loadedName = 'Imported_' + new Date().getTime();
                 } else if (data.paths && Array.isArray(data.paths)) {
-                    // Новый формат: объект с полями
                     loadedPaths = data.paths;
                     loadedName = data.name || 'Imported_' + new Date().getTime();
                     loadedOffset = data.offset || { x: 0, y: 0 };
@@ -161,32 +209,20 @@
                     alert('Unknown file format');
                     return;
                 }
-                
-                // Создаём новую вкладку с загруженными данными
                 addProj(loadedPaths, loadedName, loadedOffset, loadedScale);
                 hideMenu();
-                
             } catch (error) {
                 console.error('Error parsing JSON:', error);
                 alert('Error loading file: ' + error.message);
             }
         };
-        
-        reader.onerror = function() {
-            alert('Error reading file');
-        };
-        
+        reader.onerror = function() { alert('Error reading file'); };
         reader.readAsText(file);
-        
-        // Очищаем input, чтобы можно было загрузить тот же файл снова
         inputElement.value = '';
     }
 
     function addProj(paths = [], name = null, offset = {x: 0, y: 0}, scale = 1) {
-        // Генерируем уникальное имя, если не передано
         const finalName = name || 'Art ' + (projects.length + 1);
-        
-        // Убеждаемся, что у каждого пути есть нужные поля
         const validPaths = paths.map(path => ({
             color: path.color || '#B388FF',
             width: path.width || 10,
@@ -203,21 +239,17 @@
         curIdx = projects.length - 1;
         updTabs();
         draw();
-        
-        // Прокручиваем к новой вкладке
         setTimeout(scrollActiveTab, 100);
     }
 
     function draw() {
         const p = projects[curIdx];
         if (!p) return;
-        
         ctx.fillStyle = '#121212'; 
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.save(); 
         ctx.translate(p.offset.x, p.offset.y); 
         ctx.scale(p.scale, p.scale);
-        
         p.paths.forEach(path => {
             if(!path.pts || path.pts.length < 1) return;
             ctx.beginPath(); 
@@ -235,18 +267,15 @@
         const list = document.getElementById('tabsList'); 
         if (!list) return;
         list.innerHTML = '';
-        
         projects.forEach((p, i) => {
             const tab = document.createElement('div');
             tab.className = `tab ${i === curIdx ? 'active' : ''} ${projects.length > 1 ? 'can-close' : ''}`;
             tab.onclick = (e) => {
-                // Не переключаем вкладку, если клик на инпуте или кнопке закрытия
                 if (e.target.tagName === 'INPUT' || e.target.classList.contains('close-tab')) return;
                 curIdx = i; 
                 updTabs(); 
                 draw();
             };
-            
             const input = document.createElement('input'); 
             input.value = p.name;
             input.onchange = (e) => { 
@@ -254,19 +283,17 @@
                 updTabs(); 
             };
             input.onclick = (e) => e.stopPropagation();
-            
             const closeBtn = document.createElement('span'); 
             closeBtn.className = 'close-tab'; 
             closeBtn.innerHTML = '×';
             closeBtn.onclick = (e) => { 
                 e.stopPropagation(); 
-                if (projects.length <= 1) return; // Не удаляем последнюю вкладку
+                if (projects.length <= 1) return;
                 projects.splice(i, 1); 
                 if (curIdx >= projects.length) curIdx = projects.length - 1;
                 updTabs(); 
                 draw(); 
             };
-            
             tab.append(input, closeBtn); 
             list.appendChild(tab);
         });
@@ -281,12 +308,7 @@
     function save() {
         if (!projects[curIdx]) return;
         const p = projects[curIdx];
-        const dataToSave = { 
-            name: p.name, 
-            paths: p.paths, 
-            offset: p.offset, 
-            scale: p.scale 
-        };
+        const dataToSave = { name: p.name, paths: p.paths, offset: p.offset, scale: p.scale };
         const jsonStr = JSON.stringify(dataToSave, null, 2);
         const blob = new Blob([jsonStr], {type: 'application/json'});
         const url = URL.createObjectURL(blob);
@@ -334,13 +356,13 @@
         hideMenu(); 
     }
     
-    function redo() { 
-        if (projects[curIdx] && projects[curIdx].redoStack.length) { 
-            const lastRedo = projects[curIdx].redoStack.pop();
-            projects[curIdx].paths.push(lastRedo); 
-            draw(); 
-        } 
-        hideMenu(); 
+    function cleanCanvas() {
+        if (projects[curIdx]) {
+            projects[curIdx].paths = [];
+            projects[curIdx].redoStack = [];
+            draw();
+        }
+        hideMenu();
     }
     
     function exportImg() { 
@@ -357,7 +379,6 @@
         e.preventDefault();
         const p = projects[curIdx];
         if (!p) return;
-        
         const touch = e.touches[0];
         if (e.touches.length === 1) {
             isDrawing = true;
@@ -375,10 +396,7 @@
             isDrawing = false;
             const t1 = e.touches[0], t2 = e.touches[1];
             lastDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-            lastMid = { 
-                x: (t1.clientX + t2.clientX) / 2, 
-                y: (t1.clientY + t2.clientY) / 2 
-            };
+            lastMid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
         }
     }, {passive: false});
 
@@ -386,7 +404,6 @@
         e.preventDefault();
         const p = projects[curIdx];
         if (!p) return;
-        
         if (isDrawing && e.touches.length === 1) {
             const touch = e.touches[0];
             const lastPath = p.paths[p.paths.length - 1];
@@ -400,20 +417,14 @@
         } else if (e.touches.length === 2) {
             const t1 = e.touches[0], t2 = e.touches[1];
             const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-            const mid = { 
-                x: (t1.clientX + t2.clientX) / 2, 
-                y: (t1.clientY + t2.clientY) / 2 
-            };
-            
+            const mid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
             p.offset.x += (mid.x - lastMid.x);
             p.offset.y += (mid.y - lastMid.y);
-
             if (lastDist > 0) {
                 const s = dist / lastDist;
                 p.offset.x = mid.x - (mid.x - p.offset.x) * s;
                 p.offset.y = mid.y - (mid.y - p.offset.y) * s;
                 p.scale *= s;
-                // Ограничиваем масштаб
                 p.scale = Math.min(Math.max(p.scale, 0.2), 5);
             }
             lastDist = dist; 
@@ -422,12 +433,8 @@
         }
     }, {passive: false});
 
-    canvas.addEventListener('touchend', () => { 
-        isDrawing = false; 
-        lastDist = 0; 
-    });
+    canvas.addEventListener('touchend', () => { isDrawing = false; lastDist = 0; });
     
-    // Поддержка мыши для отладки
     canvas.addEventListener('mousedown', (e) => {
         e.preventDefault();
         const p = projects[curIdx];
