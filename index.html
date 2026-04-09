@@ -19,12 +19,13 @@
         #tabsList { display: flex; gap: 6px; overflow-x: auto; scroll-behavior: smooth; height: 100%; align-items: center; flex-grow: 1; }
         #tabsList::-webkit-scrollbar { display: none; }
         
-        .tab { background: #3d3b41; padding: 0 14px; border-radius: 28px; display: flex; align-items: center; gap: 6px; border: 1.5px solid transparent; height: 42px; min-width: 100px; flex-shrink: 0; }
+        .tab { background: #3d3b41; padding: 0 14px; border-radius: 28px; display: flex; align-items: center; gap: 6px; border: 1.5px solid transparent; height: 42px; min-width: 100px; flex-shrink: 0; cursor: pointer; }
         .tab.active { background: var(--surf); border-color: var(--primary); }
-        .tab input { background: transparent; border: none; color: white; width: 85px; font-size: 14px; outline: none; font-weight: 500; }
-        .close-tab { color: #ff8a80; font-size: 20px; cursor: pointer; display: none; }
+        .tab input { background: transparent; border: none; color: white; width: 85px; font-size: 14px; outline: none; font-weight: 500; cursor: text; }
+        .close-tab { color: #ff8a80; font-size: 20px; cursor: pointer; display: none; padding: 0 4px; }
         .can-close .close-tab { display: block; }
-        .add-btn { background: #3d3b41; border: none; border-radius: 22px; min-width: 44px; height: 42px; color: white; font-size: 22px; margin-right: 5px; flex-shrink: 0; }
+        .add-btn { background: #3d3b41; border: none; border-radius: 22px; min-width: 44px; height: 42px; color: white; font-size: 22px; margin-right: 5px; flex-shrink: 0; cursor: pointer; }
+        .add-btn:active { background: #5a5668; }
 
         #menuBtn { background: transparent; border: none; color: white; font-size: 24px; padding: 0 10px; cursor: pointer; }
 
@@ -35,15 +36,15 @@
 
         #toolbarContainer { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 100; }
         #toolbar { background: var(--surf); padding: 6px 20px; border-radius: 55px; display: flex; gap: 12px; align-items: center; border: var(--border); box-shadow: 0 8px 30px rgba(0,0,0,0.7); position: relative; }
-        .tool-btn { background: none; border: none; font-size: 24px; padding: 9px; border-radius: 50%; }
+        .tool-btn { background: none; border: none; font-size: 24px; padding: 9px; border-radius: 50%; cursor: pointer; }
         .tool-btn.active { background: #4a4458; }
         .divider { width: 1px; height: 30px; background: #444; }
 
-        #curCol { width: 33px; height: 33px; border-radius: 50%; border: 2px solid white; transition: 0.3s; }
-        #curCol.disabled { background: #444 !important; border-color: #666; opacity: 0.3; filter: grayscale(1); }
+        #curCol { width: 33px; height: 33px; border-radius: 50%; border: 2px solid white; transition: 0.3s; cursor: pointer; }
+        #curCol.disabled { background: #444 !important; border-color: #666; opacity: 0.3; filter: grayscale(1); cursor: default; }
 
         #palette { position: absolute; bottom: 110%; right: 0; background: var(--surf); padding: 10px; border-radius: 25px; display: none; grid-template-columns: repeat(2, 1fr); gap: 10px; z-index: 210; border: var(--border); box-shadow: 0 -5px 20px rgba(0,0,0,0.5); }
-        .color-dot { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
+        .color-dot { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
 
         #sizePreview { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 120px; height: 120px; background: rgba(0,0,0,0.6); border-radius: 50%; display: none; align-items: center; justify-content: center; z-index: 300; border: 1px solid #555; pointer-events: none; }
         #sizeCircle { background: var(--primary); border-radius: 50%; opacity: 0.8; }
@@ -69,7 +70,7 @@
 </div>
 
 <div id="sizePreview"><div id="sizeCircle"></div></div>
-<input type="file" id="fin" style="display:none" onchange="load(this)">
+<input type="file" id="fin" style="display:none" accept=".json" onchange="loadFile(this)">
 
 <div id="toolbarContainer">
     <div id="toolbar">
@@ -121,58 +122,108 @@
     function updateSizePreview(val) {
         const p = document.getElementById('sizePreview');
         const c = document.getElementById('sizeCircle');
-        p.style.display = 'flex'; c.style.width = c.style.height = val + 'px';
+        p.style.display = 'flex'; 
+        c.style.width = val + 'px';
+        c.style.height = val + 'px';
     }
     function hideSizePreview() { document.getElementById('sizePreview').style.display = 'none'; }
 
-    canvas.addEventListener('touchstart', e => {
-        const p = projects[curIdx];
-        const touch = e.touches[0];
-        if (e.touches.length === 1) {
-            isDrawing = true;
-            const x = (touch.clientX - p.offset.x) / p.scale;
-            const y = (touch.clientY - p.offset.y) / p.scale;
-            p.paths.push({ color: mode==='eraser'?'#121212':color, width: document.getElementById('size').value / p.scale, pts: [{x, y}] });
-            p.redoStack = []; hideMenu();
-        } else if (e.touches.length === 2) {
-            isDrawing = false;
-            lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-            lastMid = { x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 };
-        }
-    }, {passive: false});
-
-    canvas.addEventListener('touchmove', e => {
-        e.preventDefault();
-        const p = projects[curIdx];
-        if (isDrawing && e.touches.length === 1) {
-            const touch = e.touches[0];
-            p.paths[p.paths.length-1].pts.push({ x: (touch.clientX - p.offset.x) / p.scale, y: (touch.clientY - p.offset.y) / p.scale });
-            draw();
-        } else if (e.touches.length === 2) {
-            const t1 = e.touches[0], t2 = e.touches[1];
-            const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-            const mid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
-            
-            p.offset.x += (mid.x - lastMid.x);
-            p.offset.y += (mid.y - lastMid.y);
-
-            if (lastDist > 0) {
-                const s = dist / lastDist;
-                p.offset.x = mid.x - (mid.x - p.offset.x) * s;
-                p.offset.y = mid.y - (mid.y - p.offset.y) * s;
-                p.scale *= s;
+    // ИСПРАВЛЕННАЯ ФУНКЦИЯ ЗАГРУЗКИ
+    function loadFile(inputElement) {
+        if (!inputElement.files || !inputElement.files[0]) return;
+        
+        const file = inputElement.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                
+                // Проверяем структуру данных
+                let loadedPaths = [];
+                let loadedName = 'Imported';
+                let loadedOffset = { x: 0, y: 0 };
+                let loadedScale = 1;
+                
+                // Поддержка разных форматов сохранения
+                if (Array.isArray(data)) {
+                    // Старый формат: просто массив путей
+                    loadedPaths = data;
+                    loadedName = 'Imported_' + new Date().getTime();
+                } else if (data.paths && Array.isArray(data.paths)) {
+                    // Новый формат: объект с полями
+                    loadedPaths = data.paths;
+                    loadedName = data.name || 'Imported_' + new Date().getTime();
+                    loadedOffset = data.offset || { x: 0, y: 0 };
+                    loadedScale = data.scale || 1;
+                } else {
+                    console.error('Unknown file format');
+                    alert('Unknown file format');
+                    return;
+                }
+                
+                // Создаём новую вкладку с загруженными данными
+                addProj(loadedPaths, loadedName, loadedOffset, loadedScale);
+                hideMenu();
+                
+            } catch (error) {
+                console.error('Error parsing JSON:', error);
+                alert('Error loading file: ' + error.message);
             }
-            lastDist = dist; lastMid = mid; draw();
-        }
-    }, {passive: false});
+        };
+        
+        reader.onerror = function() {
+            alert('Error reading file');
+        };
+        
+        reader.readAsText(file);
+        
+        // Очищаем input, чтобы можно было загрузить тот же файл снова
+        inputElement.value = '';
+    }
+
+    function addProj(paths = [], name = null, offset = {x: 0, y: 0}, scale = 1) {
+        // Генерируем уникальное имя, если не передано
+        const finalName = name || 'Art ' + (projects.length + 1);
+        
+        // Убеждаемся, что у каждого пути есть нужные поля
+        const validPaths = paths.map(path => ({
+            color: path.color || '#B388FF',
+            width: path.width || 10,
+            pts: path.pts || []
+        })).filter(path => path.pts && path.pts.length > 0);
+        
+        projects.push({ 
+            name: finalName, 
+            paths: validPaths, 
+            redoStack: [], 
+            offset: offset, 
+            scale: scale 
+        });
+        curIdx = projects.length - 1;
+        updTabs();
+        draw();
+        
+        // Прокручиваем к новой вкладке
+        setTimeout(scrollActiveTab, 100);
+    }
 
     function draw() {
         const p = projects[curIdx];
-        ctx.fillStyle = '#121212'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.save(); ctx.translate(p.offset.x, p.offset.y); ctx.scale(p.scale, p.scale);
+        if (!p) return;
+        
+        ctx.fillStyle = '#121212'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.save(); 
+        ctx.translate(p.offset.x, p.offset.y); 
+        ctx.scale(p.scale, p.scale);
+        
         p.paths.forEach(path => {
-            if(path.pts.length < 1) return;
-            ctx.beginPath(); ctx.strokeStyle = path.color; ctx.lineWidth = path.width; ctx.lineCap = ctx.lineJoin = 'round';
+            if(!path.pts || path.pts.length < 1) return;
+            ctx.beginPath(); 
+            ctx.strokeStyle = path.color; 
+            ctx.lineWidth = path.width; 
+            ctx.lineCap = ctx.lineJoin = 'round';
             ctx.moveTo(path.pts[0].x, path.pts[0].y);
             for(let i=1; i<path.pts.length; i++) ctx.lineTo(path.pts[i].x, path.pts[i].y);
             ctx.stroke();
@@ -181,17 +232,43 @@
     }
 
     function updTabs() {
-        const list = document.getElementById('tabsList'); list.innerHTML = '';
+        const list = document.getElementById('tabsList'); 
+        if (!list) return;
+        list.innerHTML = '';
+        
         projects.forEach((p, i) => {
-            const d = document.createElement('div');
-            d.className = `tab ${i===curIdx?'active':''} ${projects.length>1?'can-close':''}`;
-            d.onclick = () => { curIdx = i; updTabs(); draw(); };
-            const inp = document.createElement('input'); inp.value = p.name;
-            inp.onchange = (e) => p.name = e.target.value;
-            inp.onclick = (e) => e.stopPropagation();
-            const cls = document.createElement('span'); cls.className = 'close-tab'; cls.innerHTML = '×';
-            cls.onclick = (e) => { e.stopPropagation(); projects.splice(i, 1); curIdx = Math.min(curIdx, projects.length-1); updTabs(); draw(); };
-            d.append(inp, cls); list.appendChild(d);
+            const tab = document.createElement('div');
+            tab.className = `tab ${i === curIdx ? 'active' : ''} ${projects.length > 1 ? 'can-close' : ''}`;
+            tab.onclick = (e) => {
+                // Не переключаем вкладку, если клик на инпуте или кнопке закрытия
+                if (e.target.tagName === 'INPUT' || e.target.classList.contains('close-tab')) return;
+                curIdx = i; 
+                updTabs(); 
+                draw();
+            };
+            
+            const input = document.createElement('input'); 
+            input.value = p.name;
+            input.onchange = (e) => { 
+                p.name = e.target.value; 
+                updTabs(); 
+            };
+            input.onclick = (e) => e.stopPropagation();
+            
+            const closeBtn = document.createElement('span'); 
+            closeBtn.className = 'close-tab'; 
+            closeBtn.innerHTML = '×';
+            closeBtn.onclick = (e) => { 
+                e.stopPropagation(); 
+                if (projects.length <= 1) return; // Не удаляем последнюю вкладку
+                projects.splice(i, 1); 
+                if (curIdx >= projects.length) curIdx = projects.length - 1;
+                updTabs(); 
+                draw(); 
+            };
+            
+            tab.append(input, closeBtn); 
+            list.appendChild(tab);
         });
         scrollActiveTab();
     }
@@ -201,42 +278,190 @@
         if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
 
-    function addProj(pts = [], name = null, off = {x:0, y:0}, sc = 1) {
-        projects.push({ name: name || 'Art ' + (projects.length+1), paths: pts, redoStack: [], offset: off, scale: sc });
-        curIdx = projects.length - 1; updTabs(); draw();
-    }
-
-    function load(el) {
-        const reader = new FileReader();
-        reader.onload = e => {
-            const data = JSON.parse(e.target.result);
-            const pths = Array.isArray(data) ? data : (data.paths || []);
-            addProj(pths, data.name || 'Imported', data.offset || {x:0, y:0}, data.scale || 1);
-            hideMenu(); el.value = '';
-        };
-        reader.readAsText(el.files);
-    }
-
     function save() {
+        if (!projects[curIdx]) return;
         const p = projects[curIdx];
-        const d = JSON.stringify({ name: p.name, paths: p.paths, offset: p.offset, scale: p.scale });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([d], {type:'application/json'}));
-        a.download = p.name + '.json'; a.click(); hideMenu();
+        const dataToSave = { 
+            name: p.name, 
+            paths: p.paths, 
+            offset: p.offset, 
+            scale: p.scale 
+        };
+        const jsonStr = JSON.stringify(dataToSave, null, 2);
+        const blob = new Blob([jsonStr], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); 
+        a.href = url;
+        a.download = p.name.replace(/[\\/:*?"<>|]/g, '_') + '.json'; 
+        a.click();
+        URL.revokeObjectURL(url);
+        hideMenu();
     }
 
     function setM(m) { 
-        mode = m; document.getElementById('bBrsh').classList.toggle('active', m==='brush'); 
-        document.getElementById('bErs').classList.toggle('active', m==='eraser'); 
-        document.getElementById('curCol').className = m==='eraser' ? 'disabled' : '';
+        mode = m; 
+        document.getElementById('bBrsh').classList.toggle('active', m === 'brush'); 
+        document.getElementById('bErs').classList.toggle('active', m === 'eraser'); 
+        const curColElem = document.getElementById('curCol');
+        if (m === 'eraser') {
+            curColElem.classList.add('disabled');
+        } else {
+            curColElem.classList.remove('disabled');
+        }
         document.getElementById('palette').style.display = 'none';
     }
-    function togglePal() { if(mode==='brush'){ const p = document.getElementById('palette'); p.style.display = p.style.display === 'grid' ? 'none' : 'grid'; } }
-    function pick(c) { color = c; document.getElementById('curCol').style.background = c; setM('brush'); }
-    function undo() { if (projects[curIdx].paths.length) { projects[curIdx].redoStack.push(projects[curIdx].paths.pop()); draw(); } hideMenu(); }
-    function redo() { if (projects[curIdx].redoStack.length) { projects[curIdx].paths.push(projects[curIdx].redoStack.pop()); draw(); } hideMenu(); }
-    function exportImg() { const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = projects[curIdx].name + '.png'; a.click(); hideMenu(); }
+    
+    function togglePal() { 
+        if (mode === 'brush') {
+            const pal = document.getElementById('palette'); 
+            pal.style.display = pal.style.display === 'grid' ? 'none' : 'grid'; 
+        } 
+    }
+    
+    function pick(c) { 
+        color = c; 
+        document.getElementById('curCol').style.background = c;
+        if (mode !== 'brush') setM('brush');
+        document.getElementById('palette').style.display = 'none';
+    }
+    
+    function undo() { 
+        if (projects[curIdx] && projects[curIdx].paths.length) { 
+            const lastPath = projects[curIdx].paths.pop();
+            projects[curIdx].redoStack.push(lastPath); 
+            draw(); 
+        } 
+        hideMenu(); 
+    }
+    
+    function redo() { 
+        if (projects[curIdx] && projects[curIdx].redoStack.length) { 
+            const lastRedo = projects[curIdx].redoStack.pop();
+            projects[curIdx].paths.push(lastRedo); 
+            draw(); 
+        } 
+        hideMenu(); 
+    }
+    
+    function exportImg() { 
+        if (!projects[curIdx]) return;
+        const link = document.createElement('a'); 
+        link.href = canvas.toDataURL('image/png'); 
+        link.download = projects[curIdx].name.replace(/[\\/:*?"<>|]/g, '_') + '.png'; 
+        link.click(); 
+        hideMenu(); 
+    }
 
-    canvas.addEventListener('touchend', () => { isDrawing = false; lastDist = 0; });
+    // Обработчики рисования
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const p = projects[curIdx];
+        if (!p) return;
+        
+        const touch = e.touches[0];
+        if (e.touches.length === 1) {
+            isDrawing = true;
+            const x = (touch.clientX - p.offset.x) / p.scale;
+            const y = (touch.clientY - p.offset.y) / p.scale;
+            const currentSize = document.getElementById('size').value;
+            p.paths.push({ 
+                color: mode === 'eraser' ? '#121212' : color, 
+                width: currentSize / p.scale, 
+                pts: [{x, y}] 
+            });
+            p.redoStack = []; 
+            hideMenu();
+        } else if (e.touches.length === 2) {
+            isDrawing = false;
+            const t1 = e.touches[0], t2 = e.touches[1];
+            lastDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            lastMid = { 
+                x: (t1.clientX + t2.clientX) / 2, 
+                y: (t1.clientY + t2.clientY) / 2 
+            };
+        }
+    }, {passive: false});
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        const p = projects[curIdx];
+        if (!p) return;
+        
+        if (isDrawing && e.touches.length === 1) {
+            const touch = e.touches[0];
+            const lastPath = p.paths[p.paths.length - 1];
+            if (lastPath) {
+                lastPath.pts.push({ 
+                    x: (touch.clientX - p.offset.x) / p.scale, 
+                    y: (touch.clientY - p.offset.y) / p.scale 
+                });
+                draw();
+            }
+        } else if (e.touches.length === 2) {
+            const t1 = e.touches[0], t2 = e.touches[1];
+            const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            const mid = { 
+                x: (t1.clientX + t2.clientX) / 2, 
+                y: (t1.clientY + t2.clientY) / 2 
+            };
+            
+            p.offset.x += (mid.x - lastMid.x);
+            p.offset.y += (mid.y - lastMid.y);
+
+            if (lastDist > 0) {
+                const s = dist / lastDist;
+                p.offset.x = mid.x - (mid.x - p.offset.x) * s;
+                p.offset.y = mid.y - (mid.y - p.offset.y) * s;
+                p.scale *= s;
+                // Ограничиваем масштаб
+                p.scale = Math.min(Math.max(p.scale, 0.2), 5);
+            }
+            lastDist = dist; 
+            lastMid = mid; 
+            draw();
+        }
+    }, {passive: false});
+
+    canvas.addEventListener('touchend', () => { 
+        isDrawing = false; 
+        lastDist = 0; 
+    });
+    
+    // Поддержка мыши для отладки
+    canvas.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const p = projects[curIdx];
+        if (!p) return;
+        isDrawing = true;
+        const x = (e.clientX - p.offset.x) / p.scale;
+        const y = (e.clientY - p.offset.y) / p.scale;
+        const currentSize = document.getElementById('size').value;
+        p.paths.push({ 
+            color: mode === 'eraser' ? '#121212' : color, 
+            width: currentSize / p.scale, 
+            pts: [{x, y}] 
+        });
+        p.redoStack = [];
+        draw();
+    });
+    
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDrawing) return;
+        const p = projects[curIdx];
+        if (!p) return;
+        const lastPath = p.paths[p.paths.length - 1];
+        if (lastPath) {
+            lastPath.pts.push({ 
+                x: (e.clientX - p.offset.x) / p.scale, 
+                y: (e.clientY - p.offset.y) / p.scale 
+            });
+            draw();
+        }
+    });
+    
+    canvas.addEventListener('mouseup', () => { isDrawing = false; });
+    canvas.addEventListener('mouseleave', () => { isDrawing = false; });
+
     init();
 </script>
 </body>
