@@ -21,7 +21,8 @@
         
         .tab { background: #3d3b41; padding: 0 14px; border-radius: 28px; display: flex; align-items: center; gap: 6px; border: 1.5px solid transparent; height: 42px; min-width: 100px; flex-shrink: 0; cursor: pointer; }
         .tab.active { background: var(--surf); border-color: var(--primary); }
-        .tab input { background: transparent; border: none; color: white; width: 85px; font-size: 14px; outline: none; font-weight: 500; cursor: text; }
+        .tab input { background: transparent; border: none; color: white; width: 85px; font-size: 14px; outline: none; font-weight: 500; pointer-events: none; }
+        .tab.active input { pointer-events: auto; cursor: text; }
         .close-tab { color: #aaa; font-size: 20px; cursor: pointer; display: none; padding: 0 4px; }
         .can-close .close-tab { display: block; }
         .add-btn { background: #3d3b41; border: none; border-radius: 22px; min-width: 44px; height: 42px; color: white; font-size: 22px; margin-right: 5px; flex-shrink: 0; cursor: pointer; }
