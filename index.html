@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Infinity Draw</title>
+    <title>Infinity Draw — отмена закрытия вкладок</title>
     
     <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIlNwYWNlcGFkIiwKICAic2hvcnRfbmFtZSI6ICJTcGFjZXBhZCIsCiAgInN0YXJ0X3VybCI6ICIuIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjMWUxZTFlIiwKICAidGhlbWVfY29sb3IiOiAiIzFlMWUxZSIsCiAgImljb25zIjogW3sgInNyYyI6ICJpY29uLnN2ZyIsICJ0eXBlIjogImltYWdlL3N2Zyt4bWwiLCAic2l6ZXMiOiAiNTEyeDUxMiIgfV19Cg==">
     <meta name="theme-color" content="#121212">
@@ -23,7 +23,8 @@
         .tab.active { background: var(--surf); border-color: var(--primary); }
         .tab input { background: transparent; border: none; color: white; width: 85px; font-size: 14px; outline: none; font-weight: 500; pointer-events: none; }
         .tab.active input { pointer-events: auto; cursor: text; }
-        .close-tab { color: #aaa; font-size: 20px; cursor: pointer; display: none; padding: 0 4px; }
+        .close-tab { color: #aaa; font-size: 20px; cursor: pointer; display: none; padding: 0 4px; transition: color 0.2s; border-radius: 20px; }
+        .close-tab:hover { color: #fff; background: rgba(255,255,255,0.1); }
         .can-close .close-tab { display: block; }
         .add-btn { background: #3d3b41; border: none; border-radius: 22px; min-width: 44px; height: 42px; color: white; font-size: 22px; margin-right: 5px; flex-shrink: 0; cursor: pointer; }
         .add-btn:active { background: #5a5668; }
@@ -70,7 +71,6 @@
 
         canvas { display: block; background: #121212; }
         
-        /* Плоская иконка Undo - очень тонкая линия (в 1,5 раза тоньше) */
         .undo-icon {
             background: none;
             border: none;
@@ -95,10 +95,68 @@
         }
         .undo-icon:active { background: #4a4458; }
         
-        /* Ползунок средней длины */
-        input[type="range"] { 
-            width: 110px; 
-            accent-color: var(--primary);
+        input[type="range"] { width: 110px; accent-color: var(--primary); }
+        
+        /* Тост отмены закрытия вкладки — стиль как в примере, но адаптирован */
+        .undo-toast {
+            position: fixed;
+            top: 60px;
+            left: 20px;
+            right: 20px;
+            background: #2d2d2d;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            font-family: 'Roboto', sans-serif;
+            backdrop-filter: blur(4px);
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            cursor: grab;
+            user-select: none;
+            touch-action: pan-y pinch-zoom;
+        }
+        .undo-toast.swiping {
+            transition: none;
+            cursor: grabbing;
+        }
+        .undo-toast-message {
+            color: #e0e0e0;
+            font-size: 13px;
+            flex: 1;
+            word-break: break-word;
+        }
+        .undo-toast-message strong {
+            color: white;
+            font-weight: 600;
+        }
+        .undo-toast-cancel {
+            background: transparent;
+            border: none;
+            color: #d0bcff;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .undo-toast-cancel:hover {
+            background: rgba(208, 188, 255, 0.15);
+        }
+        @media (min-width: 768px) {
+            .undo-toast {
+                left: auto;
+                right: 20px;
+                top: 60px;
+                max-width: 420px;
+                min-width: 280px;
+            }
         }
     </style>
 </head>
@@ -129,14 +187,12 @@
         <input type="range" id="size" min="2" max="120" value="10" oninput="updateSizePreview(this.value)" onchange="hideSizePreview()">
         <div id="curCol" style="background:#B388FF;" onclick="togglePal()"></div>
         <div class="divider"></div>
-        <!-- Очень тонкая белая стрелка с короткими усиками -->
         <button class="undo-icon" onclick="undo()">
             <svg viewBox="0 0 24 24">
                 <path d="M7 12L3 8L7 4" />
                 <path d="M3 8H12C14.5 8 16 9.5 16 12C16 14.5 14.5 16 12 16H9" />
             </svg>
         </button>
-        
         <div id="palette">
             <div class="color-dot" style="background: #FF8A80;" onclick="pick('#FF8A80')"></div>
             <div class="color-dot" style="background: #A7FFEB;" onclick="pick('#A7FFEB')"></div>
@@ -163,11 +219,205 @@
     const ctx = canvas.getContext('2d');
     let projects = [];
     let curIdx = 0, isDrawing = false, lastDist = 0, lastMid = null, mode = 'brush', color = '#B388FF';
-
-    // ========== СОХРАНЕНИЕ В LOCALSTORAGE ==========
+    
+    // ---------- Логика тоста отмены закрытия (как в класном примере) ----------
+    let pendingUndo = null; // { timer, interval, toast, projectData, originalIndex, wasActive, startX, isDragging }
+    
+    function dismissUndoToast(permanently = true) {
+        if (!pendingUndo) return;
+        if (pendingUndo.timer) clearTimeout(pendingUndo.timer);
+        if (pendingUndo.interval) clearInterval(pendingUndo.interval);
+        if (pendingUndo.toast && pendingUndo.toast.parentNode) pendingUndo.toast.remove();
+        if (permanently) {
+            pendingUndo = null;
+        } else {
+            pendingUndo = null;
+        }
+    }
+    
+    function escapeHtml(str) {
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+    
+    function showUndoToast(projectData, closedIndex, wasActive) {
+        if (pendingUndo) dismissUndoToast(true);
+        
+        let secondsLeft = 5;
+        const toast = document.createElement('div');
+        toast.className = 'undo-toast';
+        const messageSpan = document.createElement('span');
+        messageSpan.className = 'undo-toast-message';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'undo-toast-cancel';
+        cancelBtn.textContent = 'Cancel';
+        
+        const updateMessage = () => {
+            messageSpan.innerHTML = `Closed <strong>${escapeHtml(projectData.name)}</strong> · Undo in ${secondsLeft}s`;
+        };
+        updateMessage();
+        
+        toast.appendChild(messageSpan);
+        toast.appendChild(cancelBtn);
+        document.body.appendChild(toast);
+        
+        // Свайп для отмены (свайп вправо — удалить безвозвратно)
+        let startX = 0;
+        let currentX = 0;
+        let isDragging = false;
+        
+        const onPointerMove = (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            currentX = e.clientX;
+            let deltaX = currentX - startX;
+            if (Math.abs(deltaX) > 5) {
+                toast.classList.add('swiping');
+                let translate = deltaX;
+                if (translate < 0) translate = 0;
+                toast.style.transform = `translateX(${translate}px)`;
+                toast.style.opacity = `${1 - Math.min(1, translate / 200)}`;
+            }
+        };
+        
+        const onPointerUp = (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            toast.classList.remove('swiping');
+            const deltaX = currentX - startX;
+            if (deltaX > 100) {
+                if (pendingUndo && pendingUndo.toast === toast) {
+                    dismissUndoToast(true);
+                }
+            } else {
+                toast.style.transform = '';
+                toast.style.opacity = '';
+            }
+            document.removeEventListener('pointermove', onPointerMove);
+            document.removeEventListener('pointerup', onPointerUp);
+        };
+        
+        const onPointerDown = (e) => {
+            if (e.target === cancelBtn || cancelBtn.contains(e.target)) return;
+            startX = e.clientX;
+            currentX = startX;
+            isDragging = true;
+            toast.style.transition = 'none';
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerup', onPointerUp);
+        };
+        
+        toast.addEventListener('pointerdown', onPointerDown);
+        
+        cancelBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (pendingUndo && pendingUndo.toast === toast) {
+                // Восстановление проекта
+                projects.splice(closedIndex, 0, projectData);
+                if (wasActive) {
+                    curIdx = closedIndex;
+                } else if (curIdx >= closedIndex) {
+                    curIdx++;
+                }
+                updTabs();
+                draw();
+                saveState();
+                dismissUndoToast(true);
+                // фокус на канвас не нужен, но сохраняем состояние
+            }
+        };
+        
+        const interval = setInterval(() => {
+            if (!pendingUndo || pendingUndo.toast !== toast) return;
+            secondsLeft--;
+            if (secondsLeft <= 0) {
+                clearInterval(interval);
+                if (pendingUndo && pendingUndo.toast === toast) {
+                    dismissUndoToast(true);
+                }
+            } else {
+                if (pendingUndo && pendingUndo.toast === toast) updateMessage();
+            }
+        }, 1000);
+        
+        const timer = setTimeout(() => {
+            if (pendingUndo && pendingUndo.toast === toast) {
+                dismissUndoToast(true);
+            }
+        }, 10000);
+        
+        pendingUndo = {
+            timer: timer,
+            interval: interval,
+            toast: toast,
+            projectData: projectData,
+            originalIndex: closedIndex,
+            wasActive: wasActive
+        };
+    }
+    
+    // ---------- Функция закрытия вкладки с тостом (аналог closeTabImmediately) ----------
+    function closeProjectWithUndo(index, event) {
+        if (event) event.stopPropagation();
+        if (projects.length <= 1) return; // не закрываем последнюю
+        
+        const projectToRemove = projects[index];
+        // Глубокая копия данных проекта (paths, redoStack, offset, scale)
+        const projectCopy = {
+            name: projectToRemove.name,
+            paths: projectToRemove.paths.map(path => ({
+                color: path.color,
+                width: path.width,
+                pts: path.pts.map(pt => ({ x: pt.x, y: pt.y }))
+            })),
+            redoStack: projectToRemove.redoStack.map(path => ({
+                color: path.color,
+                width: path.width,
+                pts: path.pts.map(pt => ({ x: pt.x, y: pt.y }))
+            })),
+            offset: { x: projectToRemove.offset.x, y: projectToRemove.offset.y },
+            scale: projectToRemove.scale
+        };
+        
+        const wasActive = (curIdx === index);
+        let newCurIdx = curIdx;
+        if (wasActive) {
+            if (index === projects.length - 1) newCurIdx = index - 1;
+            else newCurIdx = index;
+        } else if (curIdx > index) {
+            newCurIdx = curIdx - 1;
+        } else {
+            newCurIdx = curIdx;
+        }
+        
+        // Удаляем проект
+        projects.splice(index, 1);
+        curIdx = Math.min(newCurIdx, projects.length - 1);
+        if (curIdx < 0 && projects.length > 0) curIdx = 0;
+        
+        updTabs();
+        draw();
+        saveState();
+        
+        // Показываем тост с возможностью отмены
+        showUndoToast(projectCopy, index, wasActive);
+    }
+    
+    // ========== ОСНОВНАЯ ЛОГИКА ПРИЛОЖЕНИЯ (с заменой закрытия вкладок) ==========
     function saveState() {
         const state = {
-            projects: projects,
+            projects: projects.map(p => ({
+                name: p.name,
+                paths: p.paths,
+                redoStack: p.redoStack,
+                offset: p.offset,
+                scale: p.scale
+            })),
             curIdx: curIdx
         };
         localStorage.setItem('infinityDrawData', JSON.stringify(state));
@@ -179,7 +429,12 @@
             try {
                 const data = JSON.parse(saved);
                 if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
-                    projects = data.projects;
+                    projects = data.projects.map(p => ({
+                        ...p,
+                        redoStack: p.redoStack || [],
+                        offset: p.offset || { x: 0, y: 0 },
+                        scale: p.scale !== undefined ? p.scale : 1
+                    }));
                     curIdx = (typeof data.curIdx === 'number' && data.curIdx < projects.length) ? data.curIdx : 0;
                     return true;
                 } else {
@@ -189,15 +444,14 @@
                 console.warn('Failed to load saved data, starting fresh', e);
             }
         }
-        // Стандартный проект по умолчанию
         projects = [{ name: 'Art 1', paths: [], redoStack: [], offset: {x:0, y:0}, scale: 1 }];
         curIdx = 0;
-        saveState(); // сразу сохраним дефолтное состояние
+        saveState();
         return false;
     }
 
     function init() {
-        loadState();               // восстановить проекты из localStorage
+        loadState();
         window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; draw(); };
         window.onresize(); 
         updTabs(); 
@@ -241,18 +495,15 @@
                     loadedOffset = data.offset || { x: 0, y: 0 };
                     loadedScale = data.scale || 1;
                 } else {
-                    console.error('Unknown file format');
                     alert('Unknown file format');
                     return;
                 }
                 addProj(loadedPaths, loadedName, loadedOffset, loadedScale);
                 hideMenu();
             } catch (error) {
-                console.error('Error parsing JSON:', error);
                 alert('Error loading file: ' + error.message);
             }
         };
-        reader.onerror = function() { alert('Error reading file'); };
         reader.readAsText(file);
         inputElement.value = '';
     }
@@ -262,7 +513,7 @@
         const validPaths = paths.map(path => ({
             color: path.color || '#B388FF',
             width: path.width || 10,
-            pts: path.pts || []
+            pts: (path.pts || []).map(pt => ({ x: pt.x, y: pt.y }))
         })).filter(path => path.pts && path.pts.length > 0);
         
         projects.push({ 
@@ -275,7 +526,7 @@
         curIdx = projects.length - 1;
         updTabs();
         draw();
-        saveState();                     // ← сохранить после добавления
+        saveState();
         setTimeout(scrollActiveTab, 100);
     }
 
@@ -312,27 +563,23 @@
                 curIdx = i; 
                 updTabs(); 
                 draw();
-                saveState();                 // ← сохранить текущий индекс
+                saveState();
             };
             const input = document.createElement('input'); 
             input.value = p.name;
             input.onchange = (e) => { 
                 p.name = e.target.value; 
                 updTabs(); 
-                saveState();                // ← сохранить новое имя
+                saveState();
             };
             input.onclick = (e) => e.stopPropagation();
             const closeBtn = document.createElement('span'); 
             closeBtn.className = 'close-tab'; 
             closeBtn.innerHTML = '×';
+            // ИСПОЛЬЗУЕМ НОВУЮ ФУНКЦИЮ ЗАКРЫТИЯ С ТОСТОМ
             closeBtn.onclick = (e) => { 
                 e.stopPropagation(); 
-                if (projects.length <= 1) return;
-                projects.splice(i, 1); 
-                if (curIdx >= projects.length) curIdx = projects.length - 1;
-                updTabs(); 
-                draw(); 
-                saveState();                // ← сохранить после удаления
+                closeProjectWithUndo(i, e);
             };
             tab.append(input, closeBtn); 
             list.appendChild(tab);
@@ -392,7 +639,7 @@
             const lastPath = projects[curIdx].paths.pop();
             projects[curIdx].redoStack.push(lastPath); 
             draw(); 
-            saveState();                  // ← сохранить после undo
+            saveState();
         } 
         hideMenu(); 
     }
@@ -402,7 +649,7 @@
             projects[curIdx].paths = [];
             projects[curIdx].redoStack = [];
             draw();
-            saveState();                  // ← сохранить после очистки
+            saveState();
         }
         hideMenu();
     }
@@ -416,14 +663,11 @@
         hideMenu(); 
     }
 
-    // Сохранение после завершения штриха
     function onDrawingEnd() {
-        if (projects[curIdx]) {
-            saveState();
-        }
+        if (projects[curIdx]) saveState();
     }
 
-    // Обработчики рисования
+    // Обработчики рисования (без изменений, они рабочие)
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
         const p = projects[curIdx];
@@ -479,7 +723,7 @@
             lastDist = dist; 
             lastMid = mid; 
             draw();
-            saveState();                     // ← сохранить изменения масштаба/сдвига
+            saveState();
         }
     }, {passive: false});
 
