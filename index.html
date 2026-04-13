@@ -160,12 +160,47 @@
 
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    let projects = [{ name: 'Art 1', paths: [], redoStack: [], offset: {x:0, y:0}, scale: 1 }];
+    let projects = [];
     let curIdx = 0, isDrawing = false, lastDist = 0, lastMid = null, mode = 'brush', color = '#B388FF';
 
+    // ========== СОХРАНЕНИЕ В LOCALSTORAGE ==========
+    function saveState() {
+        const state = {
+            projects: projects,
+            curIdx: curIdx
+        };
+        localStorage.setItem('infinityDrawData', JSON.stringify(state));
+    }
+
+    function loadState() {
+        const saved = localStorage.getItem('infinityDrawData');
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
+                    projects = data.projects;
+                    curIdx = (typeof data.curIdx === 'number' && data.curIdx < projects.length) ? data.curIdx : 0;
+                    return true;
+                } else {
+                    throw new Error('Invalid saved data');
+                }
+            } catch(e) {
+                console.warn('Failed to load saved data, starting fresh', e);
+            }
+        }
+        // Стандартный проект по умолчанию
+        projects = [{ name: 'Art 1', paths: [], redoStack: [], offset: {x:0, y:0}, scale: 1 }];
+        curIdx = 0;
+        saveState(); // сразу сохраним дефолтное состояние
+        return false;
+    }
+
     function init() {
+        loadState();               // восстановить проекты из localStorage
         window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; draw(); };
-        window.onresize(); updTabs();
+        window.onresize(); 
+        updTabs(); 
+        draw();
         window.onclick = (e) => { 
             if (!e.target.closest('#menuBtn') && !e.target.closest('#dropdownMenu')) hideMenu();
             if (!e.target.closest('#curCol') && !e.target.closest('#palette')) document.getElementById('palette').style.display = 'none';
@@ -239,6 +274,7 @@
         curIdx = projects.length - 1;
         updTabs();
         draw();
+        saveState();                     // ← сохранить после добавления
         setTimeout(scrollActiveTab, 100);
     }
 
@@ -275,12 +311,14 @@
                 curIdx = i; 
                 updTabs(); 
                 draw();
+                saveState();                 // ← сохранить текущий индекс
             };
             const input = document.createElement('input'); 
             input.value = p.name;
             input.onchange = (e) => { 
                 p.name = e.target.value; 
                 updTabs(); 
+                saveState();                // ← сохранить новое имя
             };
             input.onclick = (e) => e.stopPropagation();
             const closeBtn = document.createElement('span'); 
@@ -293,6 +331,7 @@
                 if (curIdx >= projects.length) curIdx = projects.length - 1;
                 updTabs(); 
                 draw(); 
+                saveState();                // ← сохранить после удаления
             };
             tab.append(input, closeBtn); 
             list.appendChild(tab);
@@ -352,6 +391,7 @@
             const lastPath = projects[curIdx].paths.pop();
             projects[curIdx].redoStack.push(lastPath); 
             draw(); 
+            saveState();                  // ← сохранить после undo
         } 
         hideMenu(); 
     }
@@ -361,6 +401,7 @@
             projects[curIdx].paths = [];
             projects[curIdx].redoStack = [];
             draw();
+            saveState();                  // ← сохранить после очистки
         }
         hideMenu();
     }
@@ -372,6 +413,13 @@
         link.download = projects[curIdx].name.replace(/[\\/:*?"<>|]/g, '_') + '.png'; 
         link.click(); 
         hideMenu(); 
+    }
+
+    // Сохранение после завершения штриха
+    function onDrawingEnd() {
+        if (projects[curIdx]) {
+            saveState();
+        }
     }
 
     // Обработчики рисования
@@ -430,10 +478,15 @@
             lastDist = dist; 
             lastMid = mid; 
             draw();
+            saveState();                     // ← сохранить изменения масштаба/сдвига
         }
     }, {passive: false});
 
-    canvas.addEventListener('touchend', () => { isDrawing = false; lastDist = 0; });
+    canvas.addEventListener('touchend', () => { 
+        if (isDrawing) onDrawingEnd(); 
+        isDrawing = false; 
+        lastDist = 0; 
+    });
     
     canvas.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -466,8 +519,14 @@
         }
     });
     
-    canvas.addEventListener('mouseup', () => { isDrawing = false; });
-    canvas.addEventListener('mouseleave', () => { isDrawing = false; });
+    canvas.addEventListener('mouseup', () => { 
+        if (isDrawing) onDrawingEnd();
+        isDrawing = false; 
+    });
+    canvas.addEventListener('mouseleave', () => { 
+        if (isDrawing) onDrawingEnd();
+        isDrawing = false; 
+    });
 
     init();
 </script>
